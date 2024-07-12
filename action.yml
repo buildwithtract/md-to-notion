@@ -1,0 +1,7 @@
+name: md-to-notion
+description: Write markdown content to Notion
+author: Henry Dashwood
+
+runs:
+  using: "node20"
+  main: "dist/index.js"
