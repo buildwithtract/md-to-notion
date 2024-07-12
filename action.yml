@@ -2,6 +2,11 @@ name: md-to-notion
 description: Write markdown content to Notion
 author: Henry Dashwood
 
+inputs:
+  notion-token:
+    description: "Notion integration token"
+    required: true
+
 runs:
   using: "node20"
   main: "dist/index.js"
