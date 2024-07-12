@@ -1,7 +1,9 @@
 name: Markdown to Notion
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - master
 
 jobs:
   build:
@@ -9,3 +11,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./
+        with:
+          notion-token: ${{ secrets.NOTION_TOKEN }}
