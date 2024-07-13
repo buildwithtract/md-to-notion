@@ -7,8 +7,6 @@ import * as github from "@actions/github";
 import path from "node:path";
 import { getCtx } from "./actionCtx";
 import fs from "fs/promises";
-import { retry, RetryError } from "./retry";
-import * as core from "@actions/core";
 
 export async function listMdFilesInRepo() {
   const files = await fs.readdir("./");
@@ -18,19 +16,8 @@ export async function listMdFilesInRepo() {
 export async function pushMarkdownFiles() {
   const mdFileNames = await listMdFilesInRepo();
   console.log(mdFileNames);
-  const fileFailures: { file: string; message: string }[] = [];
   for (const mdFileName of mdFileNames) {
-    const res = await retry(() => pushMarkdownFile(mdFileName), {
-      tries: 2,
-    });
-
-    if (res instanceof RetryError) {
-      console.log("Failed to push markdown file", res);
-      fileFailures.push({ file: mdFileName, message: res.message });
-    }
-  }
-  if (fileFailures.length) {
-    core.setFailed(`Files failed to push: ${fileFailures}`);
+    pushMarkdownFile(mdFileName);
   }
 }
 
