@@ -1,14 +1,17 @@
-import { getInput } from "@actions/core";
-import fs from "fs/promises";
+import * as core from "@actions/core";
 
-const NOTION_TOKEN = getInput("notion-token");
+import { NotionApi } from "./notion";
+import { pushMarkdownFiles } from "./markdown";
+import { actionStore } from "./actionCtx";
 
-export async function listMdFilesInRepo() {
-  const files = await fs.readdir("./");
-  return files.filter((file) => file.endsWith(".md"));
+async function main() {
+  console.log("Hello via Bun!");
+  try {
+    const token = core.getInput("notion-token");
+    const notion = new NotionApi(token);
+
+    await actionStore.run({ notion }, pushMarkdownFiles);
+  } catch (e) {
+    core.setFailed(e instanceof Error ? e.message : "Unknown reason");
+  }
 }
-
-console.log("Hello via Bun!");
-
-const mdFiles = await listMdFilesInRepo();
-console.log(mdFiles);
