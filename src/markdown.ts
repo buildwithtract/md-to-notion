@@ -35,11 +35,15 @@ export async function pushMarkdownFiles() {
 }
 
 export async function pushMarkdownFile(mdFilePath: string) {
+  console.log(`mdFilePath: ${mdFilePath}`);
   const { notion } = getCtx();
   const fileContents = await pfs.readFile(mdFilePath, { encoding: "utf-8" });
   const fileMatter = graymatter(fileContents);
 
+  console.log(fileMatter.data);
+
   if (!isNotionFrontmatter(fileMatter.data)) {
+    console.log("No notion frontmatter found");
     return;
   }
 
