@@ -14,5 +14,3 @@ jobs:
       - uses: ./
         with:
           notion-token: ${{ secrets.NOTION_TOKEN }}
-      - run: bun install
-      - run: bun src/index.ts
