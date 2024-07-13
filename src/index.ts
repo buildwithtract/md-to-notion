@@ -15,3 +15,5 @@ async function main() {
     core.setFailed(e instanceof Error ? e.message : "Unknown reason");
   }
 }
+
+main();
