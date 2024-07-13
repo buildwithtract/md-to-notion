@@ -1,5 +1,5 @@
 ---
-notion-page: https://www.notion.so/buildwithtract/test-30f4bd21a99040da9f3ea8f5e55311a9
+notion_page: https://www.notion.so/buildwithtract/test-30f4bd21a99040da9f3ea8f5e55311a9
 title: test
 ---
 
