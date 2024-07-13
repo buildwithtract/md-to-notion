@@ -8,37 +8,40 @@ import path from "node:path";
 import { getCtx } from "./actionCtx";
 import fs from "fs/promises";
 
-export async function listMdFilesInRepo() {
-  const files = await fs.readdir("./");
-  return files.filter((file) => file.endsWith(".md"));
+export async function listMdFilesInRepo(dir: string = "./"): Promise<string[]> {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        return listMdFilesInRepo(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+        return [fullPath];
+      }
+      return [];
+    })
+  );
+  return files.flat();
 }
 
 export async function pushMarkdownFiles() {
-  const mdFileNames = await listMdFilesInRepo();
-  console.log(mdFileNames);
-  for (const mdFileName of mdFileNames) {
-    console.log(`Pushing markdown file: ${mdFileName}`);
-    await pushMarkdownFile(mdFileName);
+  const mdFilePaths = await listMdFilesInRepo();
+  for (const mdFilePath of mdFilePaths) {
+    const fileContents = await pfs.readFile(mdFilePath, { encoding: "utf-8" });
+    const fileMatter = graymatter(fileContents);
+    if (isNotionFrontmatter(fileMatter.data)) {
+      console.log("Notion frontmatter found", {
+        frontmatter: fileMatter.data,
+        file: mdFilePath,
+      });
+      await pushMarkdownFile(mdFilePath, fileMatter);
+    }
   }
 }
 
-export async function pushMarkdownFile(mdFilePath: string) {
+export async function pushMarkdownFile(mdFilePath: string, fileMatter: any) {
   console.log(`mdFilePath: ${mdFilePath}`);
   const { notion } = getCtx();
-  const fileContents = await pfs.readFile(mdFilePath, { encoding: "utf-8" });
-  const fileMatter = graymatter(fileContents);
-
-  console.log(fileMatter.data);
-
-  if (!isNotionFrontmatter(fileMatter.data)) {
-    console.log("No notion frontmatter found");
-    return;
-  }
-
-  console.log("Notion frontmatter found", {
-    frontmatter: fileMatter.data,
-    file: mdFilePath,
-  });
 
   const pageData = fileMatter.data;
   const pageId = pageData.notion_page.startsWith("http")

@@ -40226,32 +40226,36 @@ var actionStore = new AsyncLocalStorage;
 
 // src/markdown.ts
 import fs from "fs/promises";
-async function listMdFilesInRepo() {
-  const files = await fs.readdir("./");
-  return files.filter((file) => file.endsWith(".md"));
+async function listMdFilesInRepo(dir = "./") {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const files = await Promise.all(entries.map(async (entry) => {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      return listMdFilesInRepo(fullPath);
+    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      return [fullPath];
+    }
+    return [];
+  }));
+  return files.flat();
 }
 async function pushMarkdownFiles() {
-  const mdFileNames = await listMdFilesInRepo();
-  console.log(mdFileNames);
-  for (const mdFileName of mdFileNames) {
-    console.log(`Pushing markdown file: ${mdFileName}`);
-    await pushMarkdownFile(mdFileName);
+  const mdFilePaths = await listMdFilesInRepo();
+  for (const mdFilePath of mdFilePaths) {
+    const fileContents = await pfs.readFile(mdFilePath, { encoding: "utf-8" });
+    const fileMatter = import_gray_matter.default(fileContents);
+    if (isNotionFrontmatter(fileMatter.data)) {
+      console.log("Notion frontmatter found", {
+        frontmatter: fileMatter.data,
+        file: mdFilePath
+      });
+      await pushMarkdownFile(mdFilePath, fileMatter);
+    }
   }
 }
-async function pushMarkdownFile(mdFilePath) {
+async function pushMarkdownFile(mdFilePath, fileMatter) {
   console.log(`mdFilePath: ${mdFilePath}`);
   const { notion: notion2 } = getCtx();
-  const fileContents = await pfs.readFile(mdFilePath, { encoding: "utf-8" });
-  const fileMatter = import_gray_matter.default(fileContents);
-  console.log(fileMatter.data);
-  if (!isNotionFrontmatter(fileMatter.data)) {
-    console.log("No notion frontmatter found");
-    return;
-  }
-  console.log("Notion frontmatter found", {
-    frontmatter: fileMatter.data,
-    file: mdFilePath
-  });
   const pageData = fileMatter.data;
   const pageId = pageData.notion_page.startsWith("http") ? path.basename(new URL(pageData.notion_page).pathname).split("-").at(-1) : pageData.notion_page;
   if (!pageId) {
