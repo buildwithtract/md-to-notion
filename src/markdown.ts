@@ -17,7 +17,7 @@ export async function pushMarkdownFiles() {
   const mdFileNames = await listMdFilesInRepo();
   console.log(mdFileNames);
   for (const mdFileName of mdFileNames) {
-    pushMarkdownFile(mdFileName);
+    await pushMarkdownFile(mdFileName);
   }
 }
 
