@@ -40144,12 +40144,152 @@ var core = __toESM(require_core(), 1);
 // src/notion.ts
 var client = __toESM(require_src(), 1);
 var martian = __toESM(require_src2(), 1);
+function isNotionFrontmatter(fm) {
+  const castFm = fm;
+  return typeof castFm?.notion_page === "string" && (typeof castFm?.title === "string" || typeof castFm?.title === "undefined");
+}
+
+class NotionApi {
+  client;
+  constructor(token) {
+    this.client = new client.Client({
+      auth: token
+    });
+  }
+  async updatePageTitle(pageId, title) {
+    await this.client.pages.update({
+      page_id: pageId,
+      properties: {
+        title: {
+          type: "title",
+          title: [
+            {
+              type: "text",
+              text: { content: title }
+            }
+          ]
+        }
+      }
+    });
+  }
+  async clearBlockChildren(blockId) {
+    for await (const block of this.listChildBlocks(blockId)) {
+      await this.client.blocks.delete({
+        block_id: block.id
+      });
+    }
+  }
+  async appendMarkdown(blockId, md, preamble = []) {
+    await this.client.blocks.children.append({
+      block_id: blockId,
+      children: [...preamble, ...martian.markdownToBlocks(md)]
+    });
+  }
+  async* listChildBlocks(blockId, batchSize = 50) {
+    let has_more = true;
+    do {
+      const blocks = await this.client.blocks.children.list({
+        block_id: blockId,
+        page_size: batchSize
+      });
+      for (const block of blocks.results) {
+        yield block;
+      }
+      has_more = blocks.has_more;
+    } while (has_more);
+  }
+}
 
 // src/markdown.ts
 var import_gray_matter = __toESM(require_gray_matter(), 1);
 var martian2 = __toESM(require_src2(), 1);
 var github = __toESM(require_github(), 1);
+import pfs from "node:fs/promises";
+import path from "node:path";
 
 // src/actionCtx.ts
 import {AsyncLocalStorage} from "node:async_hooks";
+function getCtx() {
+  const ctx = actionStore.getStore();
+  if (ctx === undefined) {
+    throw new ContextError("Get context must be called within the action function call!");
+  }
+  return ctx;
+}
+
+class ContextError extends Error {
+  constructor() {
+    super(...arguments);
+  }
+}
 var actionStore = new AsyncLocalStorage;
+
+// src/markdown.ts
+import fs from "fs/promises";
+async function listMdFilesInRepo() {
+  const files = await fs.readdir("./");
+  return files.filter((file) => file.endsWith(".md"));
+}
+async function pushMarkdownFiles() {
+  const mdFileNames = await listMdFilesInRepo();
+  console.log(mdFileNames);
+  for (const mdFileName of mdFileNames) {
+    console.log(`Pushing markdown file: ${mdFileName}`);
+    await pushMarkdownFile(mdFileName);
+  }
+}
+async function pushMarkdownFile(mdFilePath) {
+  console.log(`mdFilePath: ${mdFilePath}`);
+  const { notion: notion2 } = getCtx();
+  const fileContents = await pfs.readFile(mdFilePath, { encoding: "utf-8" });
+  const fileMatter = import_gray_matter.default(fileContents);
+  console.log(fileMatter.data);
+  if (!isNotionFrontmatter(fileMatter.data)) {
+    console.log("No notion frontmatter found");
+    return;
+  }
+  console.log("Notion frontmatter found", {
+    frontmatter: fileMatter.data,
+    file: mdFilePath
+  });
+  const pageData = fileMatter.data;
+  const pageId = pageData.notion_page.startsWith("http") ? path.basename(new URL(pageData.notion_page).pathname).split("-").at(-1) : pageData.notion_page;
+  if (!pageId) {
+    throw new Error("Could not get page ID from frontmatter");
+  }
+  if (pageData.title) {
+    console.log(`Updating title: ${pageData.title}`);
+    await notion2.updatePageTitle(pageId, pageData.title);
+  }
+  console.log("Clearing page content");
+  await notion2.clearBlockChildren(pageId);
+  console.log("Adding markdown content");
+  await notion2.appendMarkdown(pageId, fileMatter.content, [
+    createWarningBlock(mdFilePath)
+  ]);
+}
+var createWarningBlock = function(fileName) {
+  return {
+    type: "callout",
+    callout: {
+      rich_text: martian2.markdownToRichText(`This file is linked to Github. Changes must be made in the [markdown file](${github.context.payload.repository?.html_url}/blob/${github.context.sha}/${fileName}) to be permanent.`),
+      icon: {
+        emoji: "\u26A0"
+      },
+      color: "yellow_background"
+    }
+  };
+};
+
+// src/index.ts
+async function main() {
+  console.log("Hello via Bun!");
+  try {
+    const token = core.getInput("notion-token");
+    const notion3 = new NotionApi(token);
+    await actionStore.run({ notion: notion3 }, pushMarkdownFiles);
+  } catch (e) {
+    core.setFailed(e instanceof Error ? e.message : "Unknown reason");
+  }
+}
+main();
