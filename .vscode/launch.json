@@ -17,7 +17,7 @@
 
       // The environment variables to pass to the program.
       "env": {
-        "NOTION_TOKEN": "secret_1234567890"
+        "NOTION_TOKEN": "${env:NOTION_TOKEN}"
       },
 
       // If the environment variables should not be inherited from the parent process.

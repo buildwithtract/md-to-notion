@@ -40180,10 +40180,13 @@ class NotionApi {
     }
   }
   async appendMarkdown(blockId, md, preamble = []) {
-    await this.client.blocks.children.append({
-      block_id: blockId,
-      children: [...preamble, ...martian.markdownToBlocks(md)]
-    });
+    const children = [...preamble, ...martian.markdownToBlocks(md)];
+    for (let i = 0;i < children.length; i += 100) {
+      await this.client.blocks.children.append({
+        block_id: blockId,
+        children: children.slice(i, i + 100)
+      });
+    }
   }
   async* listChildBlocks(blockId, batchSize = 50) {
     let has_more = true;

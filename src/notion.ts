@@ -42,16 +42,21 @@ export class NotionApi {
    * Convert markdown to the notion block data format and append it to an existing block.
    * @param blockId Block which the markdown elements will be appended to.
    * @param md Markdown as string.
+   * @param preamble Optional preamble to append to the beginning of the markdown.
    */
   public async appendMarkdown(
     blockId: string,
     md: string,
     preamble: BlockObjectRequest[] = []
   ) {
-    await this.client.blocks.children.append({
-      block_id: blockId,
-      children: [...preamble, ...markdownToBlocks(md)],
-    });
+    const children = [...preamble, ...markdownToBlocks(md)];
+
+    for (let i = 0; i < children.length; i += 100) {
+      await this.client.blocks.children.append({
+        block_id: blockId,
+        children: children.slice(i, i + 100),
+      });
+    }
   }
 
   /**
